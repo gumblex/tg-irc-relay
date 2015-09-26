@@ -21,7 +21,7 @@ You must disable the privacy mode for your bot.
 * __ircbotname__: The name (in Telegram) of the forwarding bot. Usually it should be the same as `botname`
 * __ircchannel__: The IRC channel to forward
 * __ircnick__: The bot's nickname in IRC
-* __ircport__, __ircserver__, __ircssl__: How to connect to the IRC server
+* __ircport__, __ircserver__, __ircssl__, __ircpass__: How to connect to the IRC server. `ircpass` is optional, can be blank.
 * __offset__: Use 0 for the first time, don't manually change it after
 * __t2i__: true/false, Enable/disable Telegram to IRC forwarding
 * __token__: Your bot's token

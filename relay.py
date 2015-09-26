@@ -108,6 +108,8 @@ def checkircconn():
     if not ircconn or not ircconn.sock:
         ircconn = libirc.IRCConnection()
         ircconn.connect((CFG['ircserver'], CFG['ircport']), use_ssl=CFG['ircssl'])
+        if CFG.get('ircpass'):
+            ircconn.setpass(CFG['ircpass'])
         ircconn.setnick(CFG['ircnick'])
         ircconn.setuser(CFG['ircnick'], CFG['ircnick'])
         ircconn.join(CFG['ircchannel'])

@@ -9,6 +9,7 @@
     "ircbotname": "FooRelayBot",
     "ircchannel": "##Foo",
     "ircnick": "FooRelayBot",
+    "ircpass": "",
     "ircport": 6697,
     "ircserver": "irc.freenode.net",
     "ircssl": true,
