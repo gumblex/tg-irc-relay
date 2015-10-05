@@ -30,7 +30,10 @@ import collections
 import libirc
 import requests
 
-__version__ = '1.0'
+__version__ = '1.2'
+
+MEDIA_TYPES = frozenset(('audio', 'document', 'photo', 'sticker', 'video', 'voice', 'contact', 'location', 'new_chat_participant', 'left_chat_participant', 'new_chat_title', 'new_chat_photo', 'delete_chat_photo', 'group_chat_created'))
+EXT_MEDIA_TYPES = frozenset(('audio', 'document', 'photo', 'sticker', 'video', 'voice', 'contact', 'location', 'new_chat_participant', 'left_chat_participant', 'new_chat_title', 'new_chat_photo', 'delete_chat_photo', 'group_chat_created', '_ircuser'))
 
 loglevel = logging.DEBUG if sys.argv[-1] == '-d' else logging.INFO
 
@@ -158,9 +161,17 @@ def irc_forward(msg):
     if not ircconn:
         return
     try:
+        if msg['from']['id'] == CFG['ircbotid']:
+            return
         checkircconn()
-        text = msg.get('text')
-        if text and msg['from']['id'] != CFG['ircbotid'] and not text.startswith('@@@'):
+        text = msg.get('text', '')
+        mkeys = tuple(msg.keys() & MEDIA_TYPES)
+        if mkeys:
+            if text:
+                text += ' ' + servemedia(msg)
+            else:
+                text = servemedia(msg)
+        if text and not text.startswith('@@@'):
             if 'forward_from' in msg:
                 fwdname = ''
                 if msg['forward_from']['id'] in (CFG['botid'], CFG['ircbotid']):
@@ -251,10 +262,26 @@ def typing(chat_id):
     logging.info('sendChatAction: %r' % chat_id)
     bot_api('sendChatAction', chat_id=chat_id, action='typing')
 
+def getfile(file_id):
+    logging.info('getFile: %r' % file_id)
+    return bot_api('getFile', file_id=file_id)
+
+def retrieve(url, filename, raisestatus=True):
+    # NOTE the stream=True parameter
+    r = requests.get(url, stream=True)
+    if raisestatus:
+        r.raise_for_status()
+    with open(filename, 'wb') as f:
+        for chunk in r.iter_content(chunk_size=1024):
+            if chunk: # filter out keep-alive new chunks
+                f.write(chunk)
+        f.flush()
+    return r.status_code
+
 def classify(msg):
     '''
     Classify message type:
-    
+
     - Command: (0)
             All messages that start with a slash ‘/’ (see Commands above)
             Messages that @mention the bot by username
@@ -329,6 +356,8 @@ def processmsg():
         msg = d['message']
         if 'text' in msg:
             msg['text'] = msg['text'].replace('\xa0', ' ')
+        elif 'caption' in msg:
+            msg['text'] = msg['caption'].replace('\xa0', ' ')
         MSG_CACHE[msg['message_id']] = msg
         cls = classify(msg)
         logging.debug('Classified as: %s', cls)
@@ -349,6 +378,57 @@ def processmsg():
         elif cls == -1:
             sendmsg('Wrong usage', msg['chat']['id'], msg['message_id'])
 
+def cachemedia(msg):
+    '''
+    Download specified media if not exist.
+    '''
+    mt = msg.keys() & frozenset(('audio', 'document', 'sticker', 'video', 'voice'))
+    file_ext = ''
+    if mt:
+        file_id = msg[mt]['file_id']
+        file_size = msg[mt].get('file_size')
+        if mt == 'sticker':
+            file_ext = '.webp'
+    elif 'photo' in msg:
+        photo = max(msg['photo'], key=lambda x: x['width'])
+        file_id = photo['file_id']
+        file_size = photo.get('file_size')
+        file_ext = '.jpg'
+    fp = getfile(file_id)
+    file_size = fp.get('file_size') or file_size
+    file_path = fp.get('file_path')
+    if not file_path:
+        raise BotAPIFailed("can't get file_path for " + file_id)
+    file_ext = os.path.splitext(file_path)[1] or file_ext
+    cachename = file_id + file_ext
+    fpath = os.path.join(CFG['cachepath'], cachename)
+    try:
+        if os.path.isfile(fpath) and os.path.getsize(fpath) == file_size:
+            return (cachename, 304)
+    except Exception:
+        pass
+    return (cachename, retrieve(URL_FILE + file_path, fpath))
+
+def servemedia(msg):
+    '''
+    Reply type and link of media. This only generates links for photos.
+    '''
+    keys = tuple(msg.keys() & MEDIA_TYPES)
+    if not keys:
+        return ''
+    ret = '<%s>' % keys[0]
+    if 'photo' not in msg:
+        return ret
+    servemode = CFG.get('servemedia')
+    if servemode:
+        fname, code = cachemedia(msg)
+        if servemode == 'self':
+            ret += ' %s%s' % (CFG['serveurl'], fname)
+        elif servemode == 'vim-cn':
+            r = requests.post('http://img.vim-cn.com/', files={'name': open(os.path.join(CFG['cachepath'], fname), 'rb')})
+            ret += ' ' + r.text
+    return ret
+
 def dc_getufname(user, maxlen=100):
     USER_CACHE[user['id']] = (user.get('username'), user.get('first_name'), user.get('last_name'))
     name = user['first_name']
@@ -359,24 +439,24 @@ def dc_getufname(user, maxlen=100):
     return name
 
 def cmd_t2i(expr, chatid, replyid, msg):
-    '''/t2i Toggle Telegram to IRC forwarding.'''
+    '''/t2i [on|off] Toggle Telegram to IRC forwarding.'''
     global CFG
     if msg['chat']['id'] == -CFG['groupid']:
-        if CFG.get('t2i'):
+        if expr == 'off' or CFG.get('t2i'):
             CFG['t2i'] = False
             sendmsg('Telegram to IRC forwarding disabled.', chatid, replyid)
-        else:
+        elif expr == 'on' or not CFG.get('t2i'):
             CFG['t2i'] = True
             sendmsg('Telegram to IRC forwarding enabled.', chatid, replyid)
 
 def cmd_i2t(expr, chatid, replyid, msg):
-    '''/i2t Toggle IRC to Telegram forwarding.'''
+    '''/i2t [on|off] Toggle IRC to Telegram forwarding.'''
     global CFG
     if msg['chat']['id'] == -CFG['groupid']:
-        if CFG.get('i2t'):
+        if expr == 'off' or CFG.get('i2t'):
             CFG['i2t'] = False
             sendmsg('IRC to Telegram forwarding disabled.', chatid, replyid)
-        else:
+        elif expr == 'on' or not CFG.get('i2t'):
             CFG['i2t'] = True
             sendmsg('IRC to Telegram forwarding enabled.', chatid, replyid)
 
@@ -413,6 +493,7 @@ MSG_CACHE = LRUCache(10)
 CFG = json.load(open('config.json', 'r', encoding='utf-8'))
 CFG['offset'] = CFG.get('offset', 0)
 URL = 'https://api.telegram.org/bot%s/' % CFG['token']
+URL_FILE = 'https://api.telegram.org/file/bot%s/' % CFG['token']
 
 MSG_Q = queue.Queue()
 

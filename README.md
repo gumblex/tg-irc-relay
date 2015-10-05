@@ -25,6 +25,9 @@ You must disable the privacy mode for your bot.
 * __offset__: Use 0 for the first time, don't manually change it after
 * __t2i__: true/false, Enable/disable Telegram to IRC forwarding
 * __token__: Your bot's token
+* __servemedia__ (_Optional_): Can be "" or "self" or "vim-cn".
+* __cachepath__ (When "servemedia" is not empty): Where should the images be stored. **YOU are responsible for clearing this directory.** (eg. set up a cron job of `find $CACHEPATH -type f -mtime +1 -delete`.)
+* __serveurl__ (When "servemedia" is "*self*"): The url prefix where the images can be retreived from your server, which should be an alias of __cachepath__.
 
 ## See also
 
