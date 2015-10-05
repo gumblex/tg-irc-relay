@@ -137,6 +137,18 @@ def getircupd():
                 MSG_Q.put({'update_id': updateid, 'message': msg})
         time.sleep(.5)
 
+def ircconn_say(dest, msg, sendnow=True):
+    MIN_INT = 0.2
+    if not ircconn:
+        return
+    curtime = time.time()
+    delta = curtime - ircconn_say.lasttime
+    if delta < MIN_INT:
+        time.sleep(MIN_INT - delta)
+    ircconn.say(dest, msg, sendnow)
+    ircconn_say.lasttime = time.time()
+ircconn_say.lasttime = 0
+
 def irc_send(text='', reply_to_message_id=None):
     if ircconn:
         checkircconn()
@@ -154,7 +166,7 @@ def irc_send(text='', reply_to_message_id=None):
                 text = "%s: %s" % (src, text)
         text = text.strip()
         if text.count('\n') < 1:
-            ircconn.say(CFG['ircchannel'], text)
+            ircconn_say(CFG['ircchannel'], text)
 
 @async_func
 def irc_forward(msg):
@@ -196,7 +208,7 @@ def irc_forward(msg):
                 text = text[:3]
                 text[-1] += ' [...]'
             for ln in text[:3]:
-                ircconn.say(CFG['ircchannel'], '[%s] %s' % (dc_getufname(msg['from'])[:20], ln))
+                ircconn_say(CFG['ircchannel'], '[%s] %s' % (dc_getufname(msg['from'])[:20], ln))
     except Exception:
         logging.exception('Forward a message to IRC failed.')
 
