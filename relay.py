@@ -228,7 +228,7 @@ def change_session():
 def bot_api(method, **params):
     for att in range(3):
         try:
-            req = HSession.get(URL + method, params=params)
+            req = HSession.get(URL + method, params=params, timeout=60)
             retjson = req.content
             ret = json.loads(retjson.decode('utf-8'))
             break
