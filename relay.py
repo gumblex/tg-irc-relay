@@ -22,6 +22,7 @@ import sys
 import time
 import json
 import queue
+import socket
 import logging
 import threading
 import functools
@@ -38,6 +39,8 @@ EXT_MEDIA_TYPES = frozenset(('audio', 'document', 'photo', 'sticker', 'video', '
 loglevel = logging.DEBUG if sys.argv[-1] == '-d' else logging.INFO
 
 logging.basicConfig(stream=sys.stdout, format='# %(asctime)s [%(levelname)s] %(message)s', level=loglevel)
+
+socket.setdefaulttimeout(60)
 
 HSession = requests.Session()
 USERAGENT = 'TgIRCRelay/%s %s' % (__version__, HSession.headers["User-Agent"])
@@ -228,7 +231,7 @@ def change_session():
 def bot_api(method, **params):
     for att in range(3):
         try:
-            req = HSession.get(URL + method, params=params, timeout=60)
+            req = HSession.get(URL + method, params=params, timeout=45)
             retjson = req.content
             ret = json.loads(retjson.decode('utf-8'))
             break
