@@ -167,9 +167,12 @@ def irc_send(text='', reply_to_message_id=None):
                     if rnmatch:
                         src = rnmatch.group(1) or src
                 text = "%s: %s" % (src, text)
-        text = text.strip()
-        if text.count('\n') < 1:
-            ircconn_say(CFG['ircchannel'], text)
+        lines = text.splitlines()
+        if len(lines) < 3:
+            text = ' '.join(lines)
+        else:
+            text = lines[0] + ' [...] ' + lines[-1]
+        ircconn_say(CFG['ircchannel'], text)
 
 @async_func
 def irc_forward(msg):
@@ -347,7 +350,7 @@ def command(text, chatid, replyid, msg):
         if t[0][0] in "/'":
             cmd = t[0][1:].lower().replace('@' + CFG['botname'], '')
             if cmd in COMMANDS:
-                if chatid > 0 or chatid == -CFG['groupid'] or cmd in PUBLIC:
+                if chatid > 0 or chatid == -CFG['groupid']:
                     expr = ' '.join(t[1:]).strip()
                     logging.info('Command: /%s %s' % (cmd, expr[:20]))
                     COMMANDS[cmd](expr, chatid, replyid, msg)
@@ -463,6 +466,8 @@ def cmd_t2i(expr, chatid, replyid, msg):
         elif expr == 'on' or not CFG.get('t2i'):
             CFG['t2i'] = True
             sendmsg('Telegram to IRC forwarding enabled.', chatid, replyid)
+    else:
+        sendmsg('Only available in the group ' + CFG['groupname'], chatid, replyid)
 
 def cmd_i2t(expr, chatid, replyid, msg):
     '''/i2t [on|off] Toggle IRC to Telegram forwarding.'''
@@ -474,6 +479,8 @@ def cmd_i2t(expr, chatid, replyid, msg):
         elif expr == 'on' or not CFG.get('i2t'):
             CFG['i2t'] = True
             sendmsg('IRC to Telegram forwarding enabled.', chatid, replyid)
+    else:
+        sendmsg('Only available in the group ' + CFG['groupname'], chatid, replyid)
 
 def cmd_start(expr, chatid, replyid, msg):
     if chatid != -CFG['groupid']:
