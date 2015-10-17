@@ -427,6 +427,11 @@ def cachemedia(msg):
         pass
     return (cachename, retrieve(URL_FILE + file_path, fpath))
 
+def timestring_a(seconds):
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+    return '%d:%02d:%02d' % (h, m, s)
+
 def servemedia(msg):
     '''
     Reply type and link of media. This only generates links for photos.
@@ -435,16 +440,23 @@ def servemedia(msg):
     if not keys:
         return ''
     ret = '<%s>' % keys[0]
-    if 'photo' not in msg:
-        return ret
-    servemode = CFG.get('servemedia')
-    if servemode:
-        fname, code = cachemedia(msg)
-        if servemode == 'self':
-            ret += ' %s%s' % (CFG['serveurl'], fname)
-        elif servemode == 'vim-cn':
-            r = requests.post('http://img.vim-cn.com/', files={'name': open(os.path.join(CFG['cachepath'], fname), 'rb')})
-            ret += ' ' + r.text
+    if 'photo' in msg:
+        servemode = CFG.get('servemedia')
+        if servemode:
+            fname, code = cachemedia(msg)
+            if servemode == 'self':
+                ret += ' %s%s' % (CFG['serveurl'], fname)
+            elif servemode == 'vim-cn':
+                r = requests.post('http://img.vim-cn.com/', files={'name': open(os.path.join(CFG['cachepath'], fname), 'rb')})
+                ret += ' ' + r.text
+    elif 'document' in msg:
+        ret += ' %s type: %s' % (msg['document'].get('file_name', ''), msg['document'].get('mime_type', ''))
+    elif 'video' in msg:
+        ret += ' ' + timestring_a(msg['video'].get('duration', 0))
+    elif 'voice' in msg:
+        ret += ' ' + timestring_a(msg['voice'].get('duration', 0))
+    elif 'new_chat_title' in msg:
+        ret += ' ' + msg['new_chat_title']
     return ret
 
 def dc_getufname(user, maxlen=100):
