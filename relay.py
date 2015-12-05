@@ -27,6 +27,7 @@ import logging
 import threading
 import functools
 import collections
+import concurrent.futures
 
 import libirc
 import requests
@@ -84,9 +85,7 @@ def async_func(func):
                 func(*args, **kwargs)
             except Exception:
                 logging.exception('Async function failed.')
-        thr = threading.Thread(target=func_noerr, args=args, kwargs=kwargs)
-        thr.daemon = True
-        thr.start()
+        executor.submit(func_noerr, *args, **kwargs)
     return wrapped
 
 def _raise_ex(ex):
@@ -530,6 +529,7 @@ URL = 'https://api.telegram.org/bot%s/' % CFG['token']
 URL_FILE = 'https://api.telegram.org/file/bot%s/' % CFG['token']
 
 MSG_Q = queue.Queue()
+executor = concurrent.futures.ThreadPoolExecutor(3)
 
 pollthr = threading.Thread(target=getupdates)
 pollthr.daemon = True
