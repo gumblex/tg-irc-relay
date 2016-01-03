@@ -4,7 +4,7 @@
     "groupid": 12345678,
     "groupname": "Foo Group",
     "i2t": true,
-    "ircbanre": "SomeBot.*",
+    "ircignore": "SomeBot.*",
     "ircbotid": 123456789,
     "ircbotname": "FooRelayBot",
     "ircchannel": "##Foo",

@@ -16,7 +16,7 @@ You must disable the privacy mode for your bot.
 * __groupid__: The Telegram group id to be forwarded. To get it, enable debug mode `-d`, add your bot into the group, say something in the group, and copy the 'message'/'chat'/'id' from the "Msg arrived" line (without `-`). This ID MUST be positive.
 * __groupname__: The group's name
 * __i2t__: true/false, Enable/disable IRC to Telegram forwarding
-* __ircbanre__: Ban users that match the regex. Don't be empty, use "^$" to disable.
+* __ircignore__: Ignore users that match the regex. Don't be empty, use "^$" to disable.
 * __ircbotid__: The ID of the bot which forwards messages. Usually it should be the same as `botid`, except that there is another bot responsible for this.
 * __ircbotname__: The name (in Telegram) of the forwarding bot. Usually it should be the same as `botname`
 * __ircchannel__: The IRC channel to forward

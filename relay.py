@@ -126,7 +126,7 @@ def getircupd():
         checkircconn()
         line = ircconn.parse(block=False)
         if line and line["cmd"] == "PRIVMSG":
-            if line["dest"] != CFG['ircnick'] and not re.match(CFG['ircbanre'], line["nick"]):
+            if line["dest"] != CFG['ircnick'] and not re.match(CFG['ircignore'], line["nick"]):
                 updateid = -int(time.time())
                 msg = {
                     'message_id': updateid,
