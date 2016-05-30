@@ -448,6 +448,9 @@ def servemedia(msg):
             elif servemode == 'vim-cn':
                 r = requests.post('http://img.vim-cn.com/', files={'name': open(os.path.join(CFG['cachepath'], fname), 'rb')})
                 ret += ' ' + r.text
+    elif 'sticker' in msg:
+        if msg['sticker'].get('emoji'):
+            ret = msg['sticker']['emoji'] + ' ' + ret
     elif 'document' in msg:
         ret += ' %s type: %s' % (msg['document'].get('file_name', ''), msg['document'].get('mime_type', ''))
     elif 'video' in msg:
