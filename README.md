@@ -23,6 +23,7 @@ You must disable the privacy mode for your bot.
 * __ircnick__: The bot's nickname in IRC
 * __ircport__, __ircserver__, __ircssl__, __ircpass__: How to connect to the IRC server. `ircpass` is optional, can be blank.
 * __offset__: Use 0 for the first time, don't manually change it after
+* __shownick__: true/false, Enable/disable prefixing of messages sent to Telegram with the IRC nick of the sender (enabled by default)
 * __t2i__: true/false, Enable/disable Telegram to IRC forwarding
 * __token__: Your bot's token
 * __servemedia__ (_Optional_): Can be "" or "self" or "vim-cn".
