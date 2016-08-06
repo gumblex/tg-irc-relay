@@ -383,15 +383,20 @@ def processmsg():
         if cls == 0:
             rid = msg['message_id']
             if CFG.get('i2t') and '_ircuser' in msg:
-                rid = sync_sendmsg('[%s] %s' % (msg['_ircuser'], msg['text']), msg['chat']['id'])['message_id']
+                if CFG.get('shownick'):
+                    rid = sync_sendmsg('[%s] %s' % (msg['_ircuser'], msg['text']), msg['chat']['id'])['message_id']
+                else:
+                    rid = sync_sendmsg('%s' % msg['text'], msg['chat']['id'])['message_id']
             command(msg['text'], msg['chat']['id'], rid, msg)
         elif cls == 2:
             if CFG.get('i2t'):
                 act = re_ircaction.match(msg['text'])
                 if act:
                     sendmsg('** %s %s **' % (msg['_ircuser'], act.group(1)), msg['chat']['id'])
-                else:
+                elif CFG.get('shownick'):
                     sendmsg('[%s] %s' % (msg['_ircuser'], msg['text']), msg['chat']['id'])
+                else:
+                    sendmsg('%s' % msg['text'], msg['chat']['id'])
         elif cls == -1:
             sendmsg('Wrong usage', msg['chat']['id'], msg['message_id'])
 
@@ -537,6 +542,8 @@ CFG = json.load(open('config.json', 'r', encoding='utf-8'))
 CFG['offset'] = CFG.get('offset', 0)
 URL = 'https://api.telegram.org/bot%s/' % CFG['token']
 URL_FILE = 'https://api.telegram.org/file/bot%s/' % CFG['token']
+
+CFG.setdefault('shownick', True)
 
 MSG_Q = queue.Queue()
 executor = concurrent.futures.ThreadPoolExecutor(3)
