@@ -44,7 +44,7 @@ logging.basicConfig(stream=sys.stdout, format='# %(asctime)s [%(levelname)s] %(m
 socket.setdefaulttimeout(60)
 
 HSession = requests.Session()
-USERAGENT = 'TgIRCRelay/%s %s' % (__version__, HSession.headers["User-Agent"])
+USERAGENT = 'TgIRCRelay/%s' % __version__
 HSession.headers["User-Agent"] = USERAGENT
 
 re_ircaction = re.compile('^\x01ACTION (.*)\x01$')
