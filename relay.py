@@ -407,6 +407,7 @@ def cachemedia(msg):
     mt = msg.keys() & frozenset(('audio', 'document', 'sticker', 'video', 'voice'))
     file_ext = ''
     if mt:
+        mt = mt.pop()
         file_id = msg[mt]['file_id']
         file_size = msg[mt].get('file_size')
         if mt == 'sticker':
