@@ -6,6 +6,10 @@ Run: `python3 relay.py [-d]`
 
 `-d` for debug mode.
 
+## Deprecated
+
+Check out the [simple](https://github.com/gumblex/orizonhub/tree/simple) branch of orizonhub instead. This branch removes unnecessarily bloated functions, like this project and the tg-chatdig project.
+
 ## Config
 
 The config file must be `config.json`, see the example.
