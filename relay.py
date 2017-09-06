@@ -103,6 +103,7 @@ def getupdates():
             continue
         if updates:
             logging.debug('Messages coming.')
+            logging.debug(updates)
             CFG['offset'] = updates[-1]["update_id"] + 1
             for upd in updates:
                 MSG_Q.put(upd)
@@ -347,12 +348,14 @@ def command(text, chatid, replyid, msg):
         if not t:
             return
         if t[0][0] in "/'":
-            cmd = t[0][1:].lower().replace('@' + CFG['botname'], '')
+            cmd = t[0][1:].lower().replace('@' + CFG['botname'].lower(), '')
             if cmd in COMMANDS:
                 if chatid > 0 or chatid == -CFG['groupid']:
                     expr = ' '.join(t[1:]).strip()
                     logging.info('Command: /%s %s' % (cmd, expr[:20]))
                     COMMANDS[cmd](expr, chatid, replyid, msg)
+                else:
+                    sendmsg('The commmand is not available in this group.', chatid, replyid)
             elif chatid > 0:
                 sendmsg('Invalid command. Send /help for help.', chatid, replyid)
         # 233333
@@ -548,6 +551,10 @@ CFG.setdefault('shownick', True)
 
 MSG_Q = queue.Queue()
 executor = concurrent.futures.ThreadPoolExecutor(3)
+
+getme = bot_api('getMe')
+CFG['botid'] = getme['id']
+CFG['botname'] = getme.get('username', '')
 
 pollthr = threading.Thread(target=getupdates)
 pollthr.daemon = True
