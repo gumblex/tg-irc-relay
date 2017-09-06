@@ -567,8 +567,6 @@ if 'ircserver' in CFG:
     ircthr.daemon = True
     ircthr.start()
 
-# fx233es = fparser.Parser(numtype='decimal')
-
 logging.info('Satellite launched.')
 
 try:
