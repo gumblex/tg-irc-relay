@@ -4,7 +4,6 @@
 
 import errno
 import socket
-import select
 import ssl
 import sys
 import threading
@@ -30,7 +29,7 @@ def stripcomma(s):
 
 
 def tolist(s, f=None):
-    if f == None:
+    if f is None:
         try:
             if isinstance(s, (str, tostr)):
                 return [s]
@@ -86,22 +85,47 @@ class IRCConnection:
     def connect(self, addr=('irc.freenode.net', 6667), use_ssl=False):
         '''Connect to a IRC server. addr is a tuple of (server, port)'''
         self.acquire_lock()
-        try:
-            self.addr = (rmnlsp(addr[0]), addr[1])
-            if use_ssl:
-                if (3,) <= sys.version_info < (3, 3):
-                    self.sock = ssl.SSLSocket()
+        self.addr = (rmnlsp(addr[0]), addr[1])
+
+        for res in socket.getaddrinfo(self.addr[0], self.addr[1], socket.AF_UNSPEC, socket.SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            try:
+                if use_ssl:
+                    if (3,) <= sys.version_info < (3, 3):
+                        self.sock = ssl.SSLSocket(af, socktype, proto)
+                    elif sys.version_info >= (3, 4):
+                        ctx = ssl.create_default_context()
+                        if ssl.HAS_SNI:
+                            self.sock = ctx.wrap_socket(socket.socket(af, socktype, proto), server_hostname=self.addr[0])
+                        else:
+                            self.sock = ctx.wrap_socket(socket.socket(af, socktype, proto))
+                    else:
+                        self.sock = ssl.SSLSocket(sock=socket.socket(af, socktype, proto))
                 else:
-                    self.sock = ssl.SSLSocket(sock=socket.socket())
-            else:
-                self.sock = socket.socket()
-            self.sock.settimeout(300)
-            self.sock.connect(self.addr)
-            self.nick = None
-            self.recvbuf = b''
-            self.sendbuf = b''
-        finally:
+                    self.sock = socket.socket(af, socktype, proto)
+            except socket.error:
+                self.sock = None
+                continue
+            try:
+                self.sock.settimeout(300)
+                self.sock.connect(sa)
+            except socket.error:
+                self.sock.close()
+                self.sock = None
+                continue
+            break
+
+        if self.sock is None:
+            e = socket.error(
+                '[errno %d] Socket operation on non-socket' % errno.ENOTSOCK)
+            e.errno = errno.ENOTSOCK
             self.lock.release()
+            raise e
+
+        self.nick = None
+        self.recvbuf = b''
+        self.sendbuf = b''
+        self.lock.release()
 
     def quote(self, s, sendnow=True):
         '''Send a raw IRC command. Split multiple commands using \\n.'''
@@ -125,7 +149,7 @@ class IRCConnection:
                 e.errno = errno.ENOTSOCK
                 raise e
             try:
-                if sendbuf == None:
+                if sendbuf is None:
                     if self.sendbuf:
                         self.sock.sendall(self.sendbuf)
                     self.sendbuf = b''
@@ -152,16 +176,16 @@ class IRCConnection:
 
     def setuser(self, ident=None, realname=None, sendnow=True):
         '''Set user ident and real name.'''
-        if ident == None:
+        if ident is None:
             ident = self.nick
-        if realname == None:
+        if realname is None:
             realname = ident
         self.quote('USER %s %s %s :%s' % (rmnlsp(ident), rmnlsp(
             ident), rmnlsp(self.addr[0]), rmnl(realname)), sendnow=sendnow)
 
     def join(self, channel, key=None, sendnow=True):
         '''Join channel. A password is optional.'''
-        if key != None:
+        if key is not None:
             key = ' ' + key
         else:
             key = ''
@@ -170,7 +194,7 @@ class IRCConnection:
 
     def part(self, channel, reason=None, sendnow=True):
         '''Leave channel. A reason is optional.'''
-        if reason != None:
+        if reason is not None:
             reason = ' :' + reason
         else:
             reason = ''
@@ -179,7 +203,7 @@ class IRCConnection:
 
     def quit(self, reason=None, wait=True):
         '''Quit and disconnect from server. A reason is optional. If wait is True, the send buffer will be flushed.'''
-        if reason != None:
+        if reason is not None:
             reason = ' :' + reason
         else:
             reason = ''
@@ -222,7 +246,7 @@ class IRCConnection:
 
     def mode(self, target, newmode=None, sendnow=True):
         '''Read or set mode of a nick or a channel.'''
-        if newmode != None:
+        if newmode is not None:
             if target.startswith('#') or target.startswith('&'):
                 newmode = ' ' + newmode
             else:
@@ -234,7 +258,7 @@ class IRCConnection:
 
     def kick(self, channel, target, reason=None, sendnow=True):
         '''Kick a person out of the channel.'''
-        if reason != None:
+        if reason is not None:
             reason = ' :' + reason
         else:
             reason = ''
@@ -243,7 +267,7 @@ class IRCConnection:
 
     def away(self, state=None, sendnow=True):
         '''Set away status with an argument, or cancal away status without the argument'''
-        if state != None:
+        if state is not None:
             state = ' :' + state
         else:
             state = ''
@@ -256,7 +280,7 @@ class IRCConnection:
 
     def notice(self, dest, msg=None, sendnow=True):
         '''Send a notice to a specific user.'''
-        if msg != None:
+        if msg is not None:
             tmpbuf = ''
             for i in msg.splitlines():
                 if i:
@@ -269,7 +293,7 @@ class IRCConnection:
 
     def topic(self, channel, newtopic=None, sendnow=True):
         '''Set a new topic or get the current topic.'''
-        if newtopic != None:
+        if newtopic is not None:
             newtopic = ' :' + newtopic
         else:
             newtopic = ''
@@ -278,7 +302,14 @@ class IRCConnection:
 
     def recv(self, block=True):
         '''Receive stream from server.\nDo not call it directly, it should be called by parse() or recvline().'''
-        if self.recvlock.acquire():
+        if not self.recvlock.acquire():
+            if block:
+                raise threading.ThreadError('Cannot acquire lock.')
+            else:
+                return False
+
+        retry = 0
+        for i in range(1):
             try:
                 if not self.sock:
                     e = socket.error(
@@ -286,9 +317,9 @@ class IRCConnection:
                     e.errno = errno.ENOTSOCK
                     raise e
                 try:
-                    received = b''
                     if block:
                         received = self.sock.recv(self.buffer_length)
+                        retry = 0
                     else:
                         oldtimeout = self.sock.gettimeout()
                         self.sock.settimeout(0)
@@ -298,12 +329,6 @@ class IRCConnection:
                             else:
                                 received = self.sock.recv(
                                     self.buffer_length, socket.MSG_DONTWAIT)
-                        except ssl.SSLWantReadError:
-                            select.select([self.sock], [], [])
-                            received = self.sock.recv(self.buffer_length)
-                        except ssl.SSLWantWriteError:
-                            select.select([], [self.sock], [])
-                            received = self.sock.recv(self.buffer_length)
                         finally:
                             self.sock.settimeout(oldtimeout)
                             del oldtimeout
@@ -312,12 +337,21 @@ class IRCConnection:
                     else:
                         self.quit('Connection reset by peer.', wait=False)
                     return True
+                except (ssl.SSLWantReadError, ssl.SSLWantWriteError) as e:
+                    # can be a subclass of socket.error
+                    return False
                 except socket.timeout as e:
-                    try:
-                        self.quit('Operation timed out.', wait=False)
-                    finally:
-                        self.sock = None
-                    raise
+                    if retry <= 1:
+                        self.quote('PING %s' % self.nick)
+                        retry += 1
+                    else:
+                        retry = 0
+                        try:
+                            timeout_threshold = self.sock.gettimeout()
+                            self.quit('Operation timed out after %s seconds.' % timeout_threshold, wait=False)
+                        finally:
+                            self.sock = None
+                        raise
                 except socket.error as e:
                     if e.errno in (errno.EAGAIN, errno.EWOULDBLOCK):
                         return False
@@ -329,10 +363,6 @@ class IRCConnection:
                         raise
             finally:
                 self.recvlock.release()
-        elif block:
-            raise threading.ThreadError('Cannot acquire lock.')
-        else:
-            return False
 
     def recvline(self, block=True):
         '''Receive a raw line from server.\nIt calls recv(), and is called by parse() when line==None.\nIts output can be the 'line' argument of parse()'s input.'''
@@ -352,7 +382,7 @@ class IRCConnection:
 
     def parse(self, block=True, line=None):
         '''Receive messages from server and process it.\nReturning a dictionary or None.\nIts 'line' argument accepts the output of recvline().'''
-        if line == None:
+        if line is None:
             line = self.recvline(block)
         if line:
             try:
